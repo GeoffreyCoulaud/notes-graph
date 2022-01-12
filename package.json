@@ -10,7 +10,7 @@
     "cloc": "cloc --exclude-dir=\"node_modules\",\"dist\" --include-ext=\"js\",\"mjs\",\"styl\",\"pug\" ."
   },
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0-only",
   "dependencies": {
     "dotenv": "^10.0.0",
     "eventemitter3": "^4.0.7",
