@@ -1,6 +1,8 @@
 # Notes graph
 A simple visualization tool for your linked markdown notes
 
+https://user-images.githubusercontent.com/20744730/149183853-f5b46959-f789-483f-b50b-16c80bdc788e.mp4
+
 ## Dependencies
 * NodeJS
 
