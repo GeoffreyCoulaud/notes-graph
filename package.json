@@ -1,0 +1,27 @@
+{
+  "name": "notes-graph-displayer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.mjs",
+  "scripts": {
+    "serve": "node main.mjs",
+    "build": "node build.mjs",
+    "build-watch": "node build.mjs --watch",
+    "cloc": "cloc --exclude-dir=\"node_modules\",\"dist\" --include-ext=\"js\",\"mjs\",\"styl\",\"pug\" ."
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "eventemitter3": "^4.0.7",
+    "express": "^4.17.2",
+    "jsdom": "^19.0.0",
+    "markdown-it": "^12.3.2",
+    "markdown-it-wikilinks": "^1.2.0",
+    "pug": "^3.0.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.14.11",
+    "esbuild-stylus-loader": "^0.3.2"
+  }
+}
