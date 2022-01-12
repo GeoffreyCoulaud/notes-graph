@@ -1,4 +1,8 @@
 import Vect2 from "./Vect2.mjs";
+import faker from "@faker-js/faker";
+
+// Change this to true to generate random names to display under the nodes
+const ANON_TITLES = false;
 
 class Range{
 	constructor(min, max){
@@ -27,6 +31,7 @@ class Range{
 class DisplayData{
 	pos = new Vect2();
 	nlinks = 0;
+	title = undefined;
 }
 
 /**
@@ -55,7 +60,7 @@ export default class GraphSimulationDisplayer{
 	linkStrokeColor = "#abd8ab";
 	linkStrokeWidth = 2;
 	backgroundColor = "#252525";
-	scale = 1;
+	scale = 2.5;
 
 	#simulation = undefined;
 	#canvas = undefined;
@@ -73,6 +78,7 @@ export default class GraphSimulationDisplayer{
 		this.#ctx = canvas.getContext("2d");
 		for (const node of this.#simulation.nodes){
 			node.dispdata = new DisplayData();
+			node.dispdata.title = ANON_TITLES ? faker.internet.userName() : node.title;
 		}
 
 		// Get the range of number of links per node
@@ -147,7 +153,7 @@ export default class GraphSimulationDisplayer{
 			this.#ctx.textBaseline = "top";
 			this.#ctx.textAlign = "center";
 			const y = pos.y + radius + this.nodeTitleFontSize;
-			this.#ctx.fillText(node.title, pos.x, y);
+			this.#ctx.fillText(node.dispdata.title, pos.x, y);
 
 		}
 

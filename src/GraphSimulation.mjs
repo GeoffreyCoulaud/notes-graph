@@ -21,7 +21,7 @@ export default class GraphSimulation extends EventEmitter{
 	center = new Vect2(0, 0);	
 	
 	repulsionFactor = 2;
-	centerFactor = -0.00001;
+	centerFactor = -0.00002;
 	dragFactor = 1.05;
 	linkLengthSq = 100;
 	linkFactor = 0.0001;

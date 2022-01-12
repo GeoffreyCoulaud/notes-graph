@@ -12,6 +12,7 @@
   "author": "",
   "license": "GPL-3.0-only",
   "dependencies": {
+    "@faker-js/faker": "^5.5.3",
     "dotenv": "^10.0.0",
     "eventemitter3": "^4.0.7",
     "express": "^4.17.2",
