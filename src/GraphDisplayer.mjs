@@ -22,14 +22,15 @@ export default class GraphDisplayer{
 
 	nodeRadiusRange = new Range(4, 15);
 	nodeStrokeColor = "#36a56e";
-	nodeFillColor = "#37A737";
+	nodeFillColor = "#57C757";
 	nodeGrabbedFillColor = "#65ed68";
 	nodeStrokeWidth = 2;
 	nodeTitleColor = "#e0e0e0";
+	nodeTitleOutlineColor = "#505050";
 	nodeTitleFontSize = 16;
 	nodeTitleFontFamily = "sans-serif";
 	linkGrabbedStrokeColor = "#becebe";
-	linkStrokeColor = "#6b996b";
+	linkStrokeColor = "#5b695b";
 	linkStrokeWidth = 2;
 	backgroundColor = "#252525";
 
@@ -113,9 +114,11 @@ export default class GraphDisplayer{
 			// Text
 			this.#ctx.font = `${this.nodeTitleFontFamily} ${this.nodeTitleFontSize.toFixed(2)}px`;
 			this.#ctx.fillStyle = this.nodeTitleColor;
+			this.#ctx.strokeStyle = this.nodeTitleOutlineColor;
 			this.#ctx.textBaseline = "top";
 			this.#ctx.textAlign = "center";
 			const y = pos.y + radius + this.nodeTitleFontSize;
+			this.#ctx.strokeText(node.title, pos.x, y);
 			this.#ctx.fillText(node.title, pos.x, y);
 
 		}
