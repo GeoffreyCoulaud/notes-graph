@@ -2,14 +2,18 @@ import Vect2 from "./Vect2.mjs";
 
 export default class GraphUserController{
 
+	scrollPos = new Vect2(0,0);
 	pos = new Vect2(0,0);
 	click = false;
-	scrollPos = new Vect2(0,0);
+	
+	get scale(){
+		return 3 + this.scrollPos.y / 300;
+	}
 
-	#element = undefined;
+	#canvas = undefined;
 
-	constructor(element){
-		this.#element = element;
+	constructor(canvas){
+		this.#canvas = canvas;
 
 		// Handle mouse movements and clicks
 		const mouseEvents = [
@@ -19,25 +23,25 @@ export default class GraphUserController{
 			"mousedown", 
 			"mouseup"
 		];
-		const mouseEventsHandler = this.#handleMouseEvent.bind(this);
 		for (const event of mouseEvents){
-			this.#element.addEventListener(event, mouseEventsHandler);
+			this.#canvas.addEventListener(event, this.#handleMouseEvent);
 		}
 		
 		// Handle scrolling
-		const wheelEventsHandler = this.#handleWheelEvent.bind(this);
-		this.#element.addEventListener("wheel", wheelEventsHandler);
+		this.#canvas.addEventListener("wheel", this.#handleWheelEvent);
 
 	}
 
-	#handleMouseEvent(event){
-		this.pos.x = event.offsetX;
-		this.pos.y = event.offsetY;
-		this.click = event.buttons & 1;
+	#handleMouseEvent = (e)=>{
+		const rect = this.#canvas.getBoundingClientRect();
+		const center = new Vect2(rect.width, rect.height).scale(0.5);
+		const newPos = new Vect2(e.offsetX, e.offsetY).sub(center);
+		this.pos = newPos;
+		this.click = e.buttons & 1;
 	}
 
-	#handleWheelEvent(event){
-		this.scrollPos.add(new Vect2(event.deltaX, event.deltaY));
+	#handleWheelEvent = (e)=>{
+		this.scrollPos.add(new Vect2(e.deltaX, e.deltaY));
 	}
 
 }

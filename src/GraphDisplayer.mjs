@@ -4,11 +4,6 @@ import faker from "@faker-js/faker";
 // Change this to true to generate random names to display under the nodes
 const ANON_TITLES = false;
 
-class DisplayData{
-	pos = new Vect2();
-	title = undefined;
-}
-
 /**
  * A class used to display a graph simulation
  * @property {Range} nodeRadiusRange - Range for node radius
@@ -28,11 +23,13 @@ export default class GraphDisplayer{
 	nodeRadiusRange = new Range(4, 15);
 	nodeStrokeColor = "#36a56e";
 	nodeFillColor = "#37A737";
+	nodeGrabbedFillColor = "#65ed68";
 	nodeStrokeWidth = 2;
 	nodeTitleColor = "#e0e0e0";
 	nodeTitleFontSize = 16;
 	nodeTitleFontFamily = "sans-serif";
-	linkStrokeColor = "#abd8ab";
+	linkGrabbedStrokeColor = "#becebe";
+	linkStrokeColor = "#6b996b";
 	linkStrokeWidth = 2;
 	backgroundColor = "#252525";
 
@@ -48,13 +45,12 @@ export default class GraphDisplayer{
 	 * @param {GraphUserController} userController - The user controller for interactivity
 	 */
 	constructor(canvas, simulation, userController){
-		this.userController = userController;
+		this.#userController = userController;
 		this.#simulation = simulation;
 		this.#canvas = canvas;
 		this.#ctx = canvas.getContext("2d");
 		for (const node of this.#simulation.nodes){
-			node.dispdata = new DisplayData();
-			node.dispdata.title = ANON_TITLES ? faker.internet.userName() : node.title;
+			node.title = ANON_TITLES ? faker.internet.userName() : node.title;
 		}
 	}
 	
@@ -62,13 +58,6 @@ export default class GraphDisplayer{
 	 * Draw the graph simulation on the canvas
 	 */
 	draw(){
-
-		// Update nodes displayed position
-		// TODO more robust scrolling to scale conversion
-		const scale = 3 + this.userController.scrollPos.y / 300; 
-		for (const node of this.#simulation.nodes){
-			node.dispdata.pos = node.simdata.pos.clone().scale(scale);
-		}
 		
 		// Update simulation viewport size
 		const { width, height } = this.#canvas.getBoundingClientRect();
@@ -76,19 +65,28 @@ export default class GraphDisplayer{
 		this.#canvas.height = height;
 		this.#canvas.width = width;
 		this.#ctx.translate(width / 2, height / 2);
+
+		// Update cursor depending on grab
+		const isGrabbing = this.#simulation.grabbedIndex !== -1;
+		const cursor = isGrabbing ? "grabbing" : "default";
+		this.#canvas.style.cursor = cursor;
 		
 		// Clear canvas
 		this.#ctx.fillStyle = this.backgroundColor;
 		this.#ctx.fillRect(-width/2, -height/2, width, height);
 		
 		// Display links
-		this.#ctx.strokeStyle = this.linkStrokeColor;
 		this.#ctx.lineWidth = this.linkStrokeWidth;
 		for (const link of this.#simulation.links){
-
+			
 			// Line between nodes
-			const start = this.#simulation.nodes[link.source].dispdata.pos;
-			const end = this.#simulation.nodes[link.target].dispdata.pos;
+			const node1 = this.#simulation.nodes[link.source];
+			const node2 = this.#simulation.nodes[link.target];
+			const start = node1.pos.clone().scale(this.#userController.scale);
+			const end   = node2.pos.clone().scale(this.#userController.scale);
+			const grabbed = node1.grabbed || node2.grabbed;
+			const color = grabbed ? this.linkGrabbedStrokeColor : this.linkStrokeColor;
+			this.#ctx.strokeStyle = color;
 			this.#ctx.beginPath();
 			this.#ctx.moveTo(start.x, start.y);
 			this.#ctx.lineTo(end.x, end.y);
@@ -102,11 +100,12 @@ export default class GraphDisplayer{
 		for (const node of this.#simulation.nodes){
 			
 			// Circle
-			const radius = node.simdata.radius;
-			const pos = node.dispdata.pos;
-
+			const pos = node.pos.clone().scale(this.#userController.scale);
+			const radius = node.radius;
+			const grabbed = node.grabbed;
+			const color = grabbed ? this.nodeGrabbedFillColor : this.nodeFillColor;
 			this.#ctx.beginPath();
-			this.#ctx.fillStyle = this.nodeFillColor;
+			this.#ctx.fillStyle = color;
 			this.#ctx.ellipse(pos.x, pos.y, radius, radius, 0, 0, Math.PI*2);
 			this.#ctx.stroke();
 			this.#ctx.fill();
@@ -117,7 +116,7 @@ export default class GraphDisplayer{
 			this.#ctx.textBaseline = "top";
 			this.#ctx.textAlign = "center";
 			const y = pos.y + radius + this.nodeTitleFontSize;
-			this.#ctx.fillText(node.dispdata.title, pos.x, y);
+			this.#ctx.fillText(node.title, pos.x, y);
 
 		}
 

@@ -1,13 +1,5 @@
 import Vect2 from "./Vect2.mjs";
 
-class SimData{
-	pos = new Vect2();
-	vel = new Vect2();
-	nlinks = 0;
-	radius = 1;
-	grabbed = false;
-}
-
 class Range{
 	constructor(min, max){
 		this.min = min;
@@ -44,16 +36,20 @@ export default class GraphSimulation{
 	#lastTickTime = undefined;
 	#radiusRange = new Range(4, 15);
 	#linksRange = new Range(+Infinity, 0);
+	#isNewClick = true;
 	
 	nodes = [];
 	links = [];
+	userController = undefined;
+	
 	center = new Vect2(0, 0);
+	grabbedIndex = -1;
+
 	repulsionFactor = 2;
 	centerFactor = -0.00002;
 	dragFactor = 1.05;
-	linkLengthSq = 100;
+	linkLengthSq = 90;
 	linkFactor = 0.0001;
-	userController = undefined;
 
 	/**
 	 * Create a graph simulation
@@ -69,32 +65,35 @@ export default class GraphSimulation{
 			return Math.random() / 1000;
 		}
 		
-		// Set initial position for each node
+		// Set additional data for each node
 		for (const node of this.nodes) {
-			node.simdata = new SimData();
-			node.simdata.pos.add(new Vect2(salt(), salt()));
+			node.pos = new Vect2(salt(), salt());
+			node.vel = new Vect2();
+			node.grabbed = false;
+			node.nlinks = 0;
+			node.radius = 1;
 		}
 
 		// Get number of links per node 
 		for (const link of this.links){
-			this.nodes[link.source].simdata.nlinks++;
-			this.nodes[link.target].simdata.nlinks++;
+			this.nodes[link.source].nlinks++;
+			this.nodes[link.target].nlinks++;
 		}
 
 		// Get the links range
 		for (const node of this.nodes){
-			if (node.simdata.nlinks < this.#linksRange.min){
-				this.#linksRange.min = node.simdata.nlinks; 
+			if (node.nlinks < this.#linksRange.min){
+				this.#linksRange.min = node.nlinks; 
 			}
-			if (node.simdata.nlinks > this.#linksRange.max){
-				this.#linksRange.max = node.simdata.nlinks; 
+			if (node.nlinks > this.#linksRange.max){
+				this.#linksRange.max = node.nlinks; 
 			}
 		}
 
 		// Set radius for every node
 		for (const node of this.nodes){
-			node.simdata.radius = Range.map(
-				node.simdata.nlinks, 
+			node.radius = Range.map(
+				node.nlinks, 
 				this.#linksRange, 
 				this.#radiusRange
 			);
@@ -112,7 +111,7 @@ export default class GraphSimulation{
 	 * @param {number} factor - Repulsion or attraction factor
 	 */
 	#applyDistanceForce(node, target, dt, f, factor = 1) {
-		const pos = node.simdata.pos;
+		const pos = node.pos;
 		const distance = pos.distanceTo(target);
 		const strength = factor * f.call(this, distance);
 		const dv = pos.clone()
@@ -120,7 +119,7 @@ export default class GraphSimulation{
 			.normalize()
 			.scale(strength)
 			.scale(dt);
-		node.simdata.vel.add(dv);
+		node.vel.add(dv);
 	}
 
 	/**
@@ -160,6 +159,7 @@ export default class GraphSimulation{
 	 */
 	#applyCenterForce(dt) {
 		for (const node of this.nodes) {
+			if (node.grabbed) continue;
 			this.#applySpringForce(node, this.center, dt, this.centerFactor);
 		}
 	}
@@ -170,11 +170,12 @@ export default class GraphSimulation{
 	 */
 	#applyRepulsionForce(dt) {
 		for (const node of this.nodes) {
+			if (node.grabbed) continue;
 			for (const target of this.nodes) {
 				if (node.index === target.index) {
 					continue;
 				}
-				const targetPos = target.simdata.pos.clone();
+				const targetPos = target.pos.clone();
 				this.#applyElectrostaticForce(node, targetPos, dt, this.repulsionFactor);
 			}
 		}
@@ -188,11 +189,15 @@ export default class GraphSimulation{
 		for (const link of this.links) {
 			const node1 = this.nodes[link.source];
 			const node2 = this.nodes[link.target];
-			const distanceSq = node1.simdata.pos.distanceSqTo(node2.simdata.pos);
+			const distanceSq = node1.pos.distanceSqTo(node2.pos);
 			const way = Math.sign(this.linkLengthSq - distanceSq);
 			const factor = this.linkFactor * way;
-			this.#applySpringForce(node1, node2.simdata.pos, dt, factor);
-			this.#applySpringForce(node2, node1.simdata.pos, dt, factor);
+			if (!node1.grabbed){
+				this.#applySpringForce(node1, node2.pos, dt, factor);
+			}
+			if (!node2.grabbed){
+				this.#applySpringForce(node2, node1.pos, dt, factor);
+			}
 		}
 	}
 
@@ -202,8 +207,9 @@ export default class GraphSimulation{
 	 */
 	#applyDragFroce(dt){
 		for (const node of this.nodes){
-			const factor = 1 / (this.dragFactor ** dt);
-			node.simdata.vel.scale(factor);
+			if (node.grabbed) continue;
+			const factor = 1 / (this.dragFactor ** dt); 
+			node.vel.scale(factor);
 		}
 	}
 
@@ -213,15 +219,54 @@ export default class GraphSimulation{
 	 */
 	#applyVelocity(dt) {
 		for (const node of this.nodes) {
-			const vel = node.simdata.vel;
+			if (node.grabbed) continue;
+			const vel = node.vel;
 			const dp = vel.clone().scale(dt);
-			node.simdata.pos.add(dp);
+			node.pos.add(dp);
 		}
 	}
 
-	#selectGrabbedNode(){
-		// TODO code
-		// TODO don't update grabbed nodes
+	/**
+	 * Update if a node is grabbed and which one
+	 */
+	#updateGrabbedNode(){
+		if (!this.userController.click){
+			// On declick, de-grab
+			if (this.grabbedIndex !== -1){
+				this.nodes[this.grabbedIndex].grabbed = false;
+				this.grabbedIndex = -1;
+			}
+			this.#isNewClick = true;
+
+		} else {
+			// On new click, grab
+			if (this.#isNewClick){
+				// Find the grabbed (last to first)
+				let i = this.nodes.length - 1;
+				this.grabbedIndex = -1;
+				do {
+					const node = this.nodes[i];
+					const pos = node.pos.clone().scale(this.userController.scale);
+					const distanceSq = this.userController.pos.distanceSqTo(pos);
+					const radiusSq = node.radius ** 2;
+					if (distanceSq <= radiusSq){
+						node.grabbed = true;
+						this.grabbedIndex = i;
+						break;
+					}
+					i--;
+				} while (i >= 0);
+				this.#isNewClick = false;
+			}
+		}
+	}
+
+	#moveGrabbedNode(){
+		if (this.grabbedIndex === -1) return;
+		const node = this.nodes[this.grabbedIndex];
+		const pos = this.userController.pos.clone()
+			.scale(1/this.userController.scale);
+		node.pos = pos;
 	}
 
 	/**
@@ -234,7 +279,8 @@ export default class GraphSimulation{
 			return;
 		}
 		const dt = now - this.#lastTickTime;
-		this.#selectGrabbedNode();
+		this.#updateGrabbedNode();
+		this.#moveGrabbedNode();
 		this.#applyCenterForce(dt);
 		this.#applyRepulsionForce(dt);
 		this.#applyLinkForce(dt);
