@@ -4,33 +4,8 @@ import faker from "@faker-js/faker";
 // Change this to true to generate random names to display under the nodes
 const ANON_TITLES = false;
 
-class Range{
-	constructor(min, max){
-		this.min = min;
-		this.max = max;
-	}
-	
-	get span(){
-		return this.max - this.min;
-	}
-
-	/**
-	 * Map a number from a range to another
-	 * @param {number} value - The value to get in the new range
-	 * @param {Range} from - The range in which the value is currently
-	 * @param {Range} to - The range in which to convert the value
-	 * @returns {number}
-	 */
-	static map(value, from, to){
-		const proportion = (value - from.min) / from.span;
-		const mapped = proportion * to.span + to.min;
-		return mapped;
-	}
-}
-
 class DisplayData{
 	pos = new Vect2();
-	nlinks = 0;
 	title = undefined;
 }
 
@@ -48,7 +23,7 @@ class DisplayData{
  * @property {string} backgroundColor - Color used for the canvas background
  * @property {Vect2} center - The simulation's center
  */
-export default class GraphSimulationDisplayer{
+export default class GraphDisplayer{
 
 	nodeRadiusRange = new Range(4, 15);
 	nodeStrokeColor = "#36a56e";
@@ -60,19 +35,20 @@ export default class GraphSimulationDisplayer{
 	linkStrokeColor = "#abd8ab";
 	linkStrokeWidth = 2;
 	backgroundColor = "#252525";
-	scale = 2.5;
 
+	#userController = undefined;
 	#simulation = undefined;
 	#canvas = undefined;
 	#ctx = undefined;
-	#linksRange = new Range(+Infinity, 0);
 	
 	/**
 	 * Create a graph simulation displayer
-	 * @param {GraphSimulation} simulation - The simulation to draw
 	 * @param {HTMLCanvasElement} canvas - The canvas to draw on 
+	 * @param {GraphSimulation} simulation - The simulation to draw
+	 * @param {GraphUserController} userController - The user controller for interactivity
 	 */
-	constructor(simulation, canvas){
+	constructor(canvas, simulation, userController){
+		this.userController = userController;
 		this.#simulation = simulation;
 		this.#canvas = canvas;
 		this.#ctx = canvas.getContext("2d");
@@ -80,20 +56,6 @@ export default class GraphSimulationDisplayer{
 			node.dispdata = new DisplayData();
 			node.dispdata.title = ANON_TITLES ? faker.internet.userName() : node.title;
 		}
-
-		// Get the range of number of links per node
-		for (const node of this.#simulation.nodes){
-			if (node.simdata.nlinks < this.#linksRange.min){
-				this.#linksRange.min = node.simdata.nlinks;
-			}
-			if (node.simdata.nlinks > this.#linksRange.max){
-				this.#linksRange.max = node.simdata.nlinks;
-			}
-		}
-
-		canvas.addEventListener("wheel", (event)=>{
-			this.scale += event.deltaY * 0.001;
-		})
 	}
 	
 	/**
@@ -102,8 +64,10 @@ export default class GraphSimulationDisplayer{
 	draw(){
 
 		// Update nodes displayed position
+		// TODO more robust scrolling to scale conversion
+		const scale = 3 + this.userController.scrollPos.y / 300; 
 		for (const node of this.#simulation.nodes){
-			node.dispdata.pos = node.simdata.pos.clone().scale(this.scale);
+			node.dispdata.pos = node.simdata.pos.clone().scale(scale);
 		}
 		
 		// Update simulation viewport size
@@ -138,7 +102,7 @@ export default class GraphSimulationDisplayer{
 		for (const node of this.#simulation.nodes){
 			
 			// Circle
-			const radius = Range.map(node.simdata.nlinks, this.#linksRange, this.nodeRadiusRange);
+			const radius = node.simdata.radius;
 			const pos = node.dispdata.pos;
 
 			this.#ctx.beginPath();

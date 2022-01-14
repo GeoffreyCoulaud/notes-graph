@@ -1,10 +1,35 @@
-import EventEmitter from "eventemitter3";
 import Vect2 from "./Vect2.mjs";
 
 class SimData{
 	pos = new Vect2();
 	vel = new Vect2();
 	nlinks = 0;
+	radius = 1;
+	grabbed = false;
+}
+
+class Range{
+	constructor(min, max){
+		this.min = min;
+		this.max = max;
+	}
+	
+	get span(){
+		return this.max - this.min;
+	}
+
+	/**
+	 * Map a number from a range to another
+	 * @param {number} value - The value to get in the new range
+	 * @param {Range} from - The range in which the value is currently
+	 * @param {Range} to - The range in which to convert the value
+	 * @returns {number}
+	 */
+	static map(value, from, to){
+		const proportion = (value - from.min) / from.span;
+		const mapped = proportion * to.span + to.min;
+		return mapped;
+	}
 }
 
 /**
@@ -14,28 +39,32 @@ class SimData{
  * @property {Vect2} size - The simulation display size
  * @emits ticked - After a simulation tick
  */
-export default class GraphSimulation extends EventEmitter{
+export default class GraphSimulation{
 	
 	#lastTickTime = undefined;
-
-	center = new Vect2(0, 0);	
+	#radiusRange = new Range(4, 15);
+	#linksRange = new Range(+Infinity, 0);
 	
+	nodes = [];
+	links = [];
+	center = new Vect2(0, 0);
 	repulsionFactor = 2;
 	centerFactor = -0.00002;
 	dragFactor = 1.05;
 	linkLengthSq = 100;
 	linkFactor = 0.0001;
+	userController = undefined;
 
 	/**
 	 * Create a graph simulation
 	 * @param {Nodes[]} nodes - The nodes to use for the simulation
 	 * @param {SimpleLink[]} links - The links between the nodes
-	 * @param {Vect2} size - The simulation's viewport size
+	 * @param {GraphUserController} userController - The user controller for interactivity
 	 */
-	constructor(nodes, links){
-		super();
+	constructor(nodes, links, userController = undefined){
 		this.nodes = nodes;
 		this.links = links;
+		this.userController = userController;
 		function salt(){
 			return Math.random() / 1000;
 		}
@@ -50,6 +79,25 @@ export default class GraphSimulation extends EventEmitter{
 		for (const link of this.links){
 			this.nodes[link.source].simdata.nlinks++;
 			this.nodes[link.target].simdata.nlinks++;
+		}
+
+		// Get the links range
+		for (const node of this.nodes){
+			if (node.simdata.nlinks < this.#linksRange.min){
+				this.#linksRange.min = node.simdata.nlinks; 
+			}
+			if (node.simdata.nlinks > this.#linksRange.max){
+				this.#linksRange.max = node.simdata.nlinks; 
+			}
+		}
+
+		// Set radius for every node
+		for (const node of this.nodes){
+			node.simdata.radius = Range.map(
+				node.simdata.nlinks, 
+				this.#linksRange, 
+				this.#radiusRange
+			);
 		}
 
 	}
@@ -171,6 +219,11 @@ export default class GraphSimulation extends EventEmitter{
 		}
 	}
 
+	#selectGrabbedNode(){
+		// TODO code
+		// TODO don't update grabbed nodes
+	}
+
 	/**
 	 * Compute the next simulation tick
 	 * @param {DOMHighResTimestamp} now - Current timestamp in millis
@@ -181,23 +234,13 @@ export default class GraphSimulation extends EventEmitter{
 			return;
 		}
 		const dt = now - this.#lastTickTime;
+		this.#selectGrabbedNode();
 		this.#applyCenterForce(dt);
 		this.#applyRepulsionForce(dt);
 		this.#applyLinkForce(dt);
 		this.#applyDragFroce(dt);
 		this.#applyVelocity(dt);
 		this.#lastTickTime = now;
-		this.emit("ticked");
-	}
-
-	/**
-	 * Start the simulation infinite loop
-	 */
-	loop() {
-		window.requestAnimationFrame((now) => {
-			this.nextTick(now);
-			this.loop();
-		});
 	}
 
 }
